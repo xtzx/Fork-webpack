@@ -23,12 +23,12 @@ hook.call(value1, value2);
 
 ### 1.2 四种钩子类型
 
-| 钩子类型 | 说明 | 特点 |
-|---------|------|-----|
-| **SyncHook** | 同步钩子 | 按顺序依次调用，不能中断 |
-| **SyncBailHook** | 同步熔断钩子 | 返回非 undefined 时停止 |
-| **AsyncSeriesHook** | 异步串行钩子 | 依次异步调用，等待每个完成 |
-| **AsyncParallelHook** | 异步并行钩子 | 同时触发所有监听器 |
+| 钩子类型                    | 说明         | 特点                       |
+| --------------------------- | ------------ | -------------------------- |
+| **SyncHook**          | 同步钩子     | 按顺序依次调用，不能中断   |
+| **SyncBailHook**      | 同步熔断钩子 | 返回非 undefined 时停止    |
+| **AsyncSeriesHook**   | 异步串行钩子 | 依次异步调用，等待每个完成 |
+| **AsyncParallelHook** | 异步并行钩子 | 同时触发所有监听器         |
 
 ---
 
@@ -48,6 +48,7 @@ initialize
 **文件位置**: `lib/webpack.js:171-180`
 
 **使用场景**:
+
 - 设置全局配置
 - 准备编译环境
 - 初始化全局状态
@@ -84,6 +85,7 @@ done ⭐
 ```
 
 **时间范围**:
+
 - beforeRun 到 done: **整个编译周期**
 - make 到 afterCompile: **核心构建过程**（最耗时）
 
@@ -104,6 +106,7 @@ contextModuleFactory     // 上下文模块工厂创建后
 ```
 
 **使用场景**:
+
 - 注册模块工厂的钩子
 - 修改 loader 解析规则
 - 自定义模块类型
@@ -142,6 +145,7 @@ compiler.hooks.make.callAsync(compilation, err => {
 ```
 
 **谁在监听**:
+
 - `EntryPlugin`: 添加入口模块
 - `DllPlugin`: 添加 DLL 入口
 - `DllReferencePlugin`: 引用 DLL
@@ -175,6 +179,7 @@ compiler.hooks.make.tapAsync('EntryPlugin', (compilation, callback) => {
 **触发位置**: `lib/Compiler.js:emitAssets` 方法内
 
 **使用场景**:
+
 - 修改输出内容
 - 添加额外文件
 - 生成清单文件
@@ -210,10 +215,12 @@ compiler.hooks.emit.tapAsync('MyPlugin', (compilation, callback) => {
 **编译完成（成功或失败）**
 
 **触发位置**:
+
 - `lib/Compiler.js:1114` (run 方法内)
 - `lib/Compiler.js:1057` (shouldEmit 为 false 时)
 
 **使用场景**:
+
 - 输出统计信息
 - 上传构建结果
 - 发送通知
@@ -246,6 +253,7 @@ compiler.hooks.done.tap('MyPlugin', (stats) => {
 **触发位置**: `lib/Compiler.js:newCompilation` 方法内
 
 **使用场景**:
+
 - 注册 Compilation 级别的钩子
 - 修改 Compilation 配置
 - 添加自定义处理逻辑
@@ -670,6 +678,7 @@ class TimingPlugin {
 ### 8.3 在关键钩子设置断点
 
 **推荐断点位置**:
+
 ```
 lib/Compiler.js:1872  // make 钩子
 lib/Compiler.js:1902  // seal 开始
@@ -697,10 +706,12 @@ EntryPlugin1 → 完成 → EntryPlugin2 → 完成 → EntryPlugin3
 ### Q2: 为什么有 thisCompilation 和 compilation 两个钩子？
 
 **答**:
+
 - `thisCompilation`: 仅在主 compiler 触发，子编译器不触发
 - `compilation`: 主 compiler 和子编译器都触发
 
 **使用场景**:
+
 ```javascript
 // 只在主编译时执行
 compiler.hooks.thisCompilation.tap('Plugin', (compilation) => {
@@ -731,6 +742,7 @@ compiler.hooks.done.tap('Plugin', (stats) => {
 ### Q4: 为什么 emit 钩子在 shouldEmit 之后？
 
 **答**:
+
 1. `shouldEmit`: 判断是否应该输出（可以取消输出）
 2. `emit`: 如果要输出，在输出前的最后机会
 
@@ -752,13 +764,13 @@ this.hooks.emit.callAsync(compilation, err => {
 
 ### 1. 选择合适的钩子
 
-| 目的 | 推荐钩子 |
-|------|---------|
-| 添加入口 | make |
-| 修改模块 | compilation + compilation.hooks.buildModule |
+| 目的     | 推荐钩子                                        |
+| -------- | ----------------------------------------------- |
+| 添加入口 | make                                            |
+| 修改模块 | compilation + compilation.hooks.buildModule     |
 | 优化代码 | compilation + compilation.hooks.optimizeModules |
-| 修改输出 | emit |
-| 统计报告 | done |
+| 修改输出 | emit                                            |
+| 统计报告 | done                                            |
 
 ### 2. 注意钩子类型
 
@@ -813,18 +825,19 @@ compiler.hooks.done.tap('Plugin', (stats) => {
 ### 核心要点
 
 1. **钩子是 webpack 插件系统的基础**
+
    - 所有扩展都通过钩子实现
    - 理解钩子就理解了 webpack 的扩展机制
-
 2. **make 和 seal 是最重要的钩子**
+
    - make: 构建模块，占 60-80% 时间
    - seal: 优化和生成代码，占 15-25% 时间
-
 3. **钩子有明确的执行顺序**
+
    - 异步钩子按注册顺序执行
    - 同步钩子立即按顺序执行
-
 4. **选择合适的钩子类型很重要**
+
    - 同步操作用同步钩子
    - 异步操作用异步钩子
    - 注意 callback 的调用
@@ -832,20 +845,22 @@ compiler.hooks.done.tap('Plugin', (stats) => {
 ### 学习建议
 
 1. **阅读已注释的源码**
+
    - lib/Compiler.js（已添加详细注释）
    - 重点看 run()、compile()、close() 方法
-
 2. **实践调试**
+
    - 在关键钩子设置断点
    - 观察执行顺序和数据
-
 3. **开发简单插件**
+
    - 从一个钩子开始
    - 逐步理解整个流程
 
 ---
 
 **相关文件**:
+
 - `lib/Compiler.js` - 已添加钩子系统和核心方法注释
 - `lib/Compilation.js` - 下一步添加注释
 - `lib/webpack.js` - createCompiler 中触发 environment/afterEnvironment/initialize
