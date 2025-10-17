@@ -85,7 +85,7 @@ graph TD
 graph TD
     Start([seal 开始后<br/>创建 Chunk 阶段]) --> Freeze[冻结 ModuleGraph<br/>moduleGraph.freeze<br/>不再修改模块关系]
 
-    Freeze --> InitMap[初始化 chunkGraphInit<br/>Map<Entrypoint, Module[]>]
+    Freeze --> InitMap[初始化 chunkGraphInit<br/>Map&lt;Entrypoint, Module[]&gt;]
 
     InitMap --> LoopEntries[遍历所有入口<br/>for entry of compilation.entries]
 
@@ -461,7 +461,7 @@ graph TD
 
     CheckCount -->|多个| MultiRT[复杂情况<br/>哈希去重 ⭐]
 
-    MultiRT --> HashMap[创建哈希映射<br/>Map<hash, job>]
+    MultiRT --> HashMap[创建哈希映射<br/>Map&lt;hash, job&gt;]
 
     HashMap --> LoopRT[遍历运行时]
 
@@ -533,7 +533,65 @@ graph TD
 > createChunkAssets - Chunk 到 Bundle 的转换 ⭐⭐⭐
 
 ```mermaid
-b
+graph TD
+    Start([createChunkAssets<br/>Chunk → Bundle]) --> LoopChunks[遍历所有 chunks]
+
+    LoopChunks --> GetModules[获取 chunk 的模块<br/>chunkGraph.getChunkModules]
+
+    GetModules --> CalcFilename[计算文件名<br/>应用占位符]
+
+    CalcFilename --> Placeholders[替换占位符:<br/>name → chunk.name<br/>hash → compilation.hash<br/>chunkhash → chunk.hash<br/>contenthash → chunk.contentHash]
+
+    Placeholders --> Example[示例:<br/>name.chunkhash.js<br/>→ main.a1b2c3d4.js]
+
+    Example --> Render[渲染 Chunk<br/>JavascriptModulesPlugin]
+
+    Render --> GenRuntime[步骤1: 生成运行时代码<br/>__webpack_require__<br/>__webpack_modules__<br/>chunk 加载函数]
+
+    GenRuntime --> WrapModules[步骤2: 包装每个模块]
+
+    WrapModules --> LoopMods[遍历 chunk.modules]
+
+    LoopMods --> GetCode[获取模块代码<br/>codeGenerationResults.get]
+
+    GetCode --> WrapFunc[包装为函数:<br/>moduleId: function(<br/>  module, exports,<br/>  __webpack_require__<br/> 模块代码<br/>)]
+
+    WrapFunc --> ApplyTree{应用 Tree Shaking?}
+
+    ApplyTree -->|是| CheckUsed[检查导出使用<br/>exportsInfo.isUsed]
+    CheckUsed --> GenUsed[只生成已使用的导出<br/>跳过未使用的]
+
+    ApplyTree -->|否| GenAll[生成所有代码]
+
+    GenUsed --> NextMod
+    GenAll --> NextMod{还有模块?}
+
+    NextMod -->|是| LoopMods
+    NextMod -->|否| Concat[步骤3: 拼接代码]
+
+    Concat --> CreateSource[创建 Source 对象<br/>ConcatSource]
+
+    CreateSource --> Structure[代码结构:<br/>━━━━━━━<br/>// runtime<br/> function webpack_require...<br/>━━━━━━━<br/>// modules<br/> 0: function...<br/> 1: function...<br/>━━━━━━━<br/>// startup<br/> webpack_require 0]
+
+    Structure --> ApplySourceMap{需要 SourceMap?}
+
+    ApplySourceMap -->|是| AddSourceMap[添加 SourceMap<br/>SourceMapSource]
+    ApplySourceMap -->|否| UseRaw[RawSource]
+
+    AddSourceMap --> SaveAsset
+    UseRaw --> SaveAsset[保存到 assets<br/>compilation.assets filename = source]
+
+    SaveAsset --> NextChunk{还有 chunk?}
+
+    NextChunk -->|是| LoopChunks
+    NextChunk -->|否| Done([完成<br/>所有 bundle 已生成])
+
+    Done --> AssetsReady[compilation.assets = <br/>main.js: Source<br/>vendors.js: Source<br/>lazy.js: Source]
+
+    style WrapFunc fill:#ffcc99
+    style GenUsed fill:#ff9999
+    style SaveAsset fill:#99ff99
+    style AssetsReady fill:#e1f5ff
 ```
 
 ---
@@ -545,25 +603,25 @@ b
 ```mermaid
 graph TB
     subgraph CG["🏗️ ChunkGraph"]
-        ChunkMap["_chunks: Map<Chunk, ChunkGraphChunk><br/>━━━━━━━━━━━<br/>chunk → {<br/>  modules: Set<Module>,<br/>  entryModules: Map,<br/>  runtimeModules: Set<br/>}"]
+        ChunkMap["_chunks: Map&lt;Chunk, ChunkGraphChunk&gt;<br/>━━━━━━━━━━━<br/>chunk → {<br/>  modules: Set&lt;Module&gt;,<br/>  entryModules: Map,<br/>  runtimeModules: Set<br/>}"]
 
-        ModuleMap["_modules: Map<Module, ChunkGraphModule><br/>━━━━━━━━━━━<br/>module → {<br/>  chunks: Set<Chunk>,<br/>  entryInChunks: Set,<br/>  runtimeInChunks: Set<br/>}"]
+        ModuleMap["_modules: Map&lt;Module, ChunkGraphModule&gt;<br/>━━━━━━━━━━━<br/>module → {<br/>  chunks: Set&lt;Chunk&gt;,<br/>  entryInChunks: Set,<br/>  runtimeInChunks: Set<br/>}"]
     end
 
     subgraph CGC["📦 ChunkGraphChunk<br/>(Chunk 在图中的信息)"]
-        Modules["modules: Set<Module><br/>━━━━━━━━━━━<br/>该 Chunk 包含的模块"]
+        Modules["modules: Set&lt;Module&gt;<br/>━━━━━━━━━━━<br/>该 Chunk 包含的模块"]
 
-        Entry["entryModules<br/>Map<Module, Entrypoint><br/>━━━━━━━━━━━<br/>入口模块"]
+        Entry["entryModules<br/>Map&lt;Module, Entrypoint&gt;<br/>━━━━━━━━━━━<br/>入口模块"]
 
-        Runtime["runtimeModules<br/>Set<RuntimeModule><br/>━━━━━━━━━━━<br/>运行时模块"]
+        Runtime["runtimeModules<br/>Set&lt;RuntimeModule&gt;<br/>━━━━━━━━━━━<br/>运行时模块"]
     end
 
     subgraph CGM["📦 ChunkGraphModule<br/>(Module 在图中的信息)"]
-        Chunks["chunks: Set<Chunk><br/>━━━━━━━━━━━<br/>该模块属于哪些 Chunk"]
+        Chunks["chunks: Set&lt;Chunk&gt;<br/>━━━━━━━━━━━<br/>该模块属于哪些 Chunk"]
 
-        EntryIn["entryInChunks<br/>Set<Chunk><br/>━━━━━━━━━━━<br/>作为入口的 Chunk"]
+        EntryIn["entryInChunks<br/>Set&lt;Chunk&gt;<br/>━━━━━━━━━━━<br/>作为入口的 Chunk"]
 
-        RuntimeIn["runtimeInChunks<br/>Set<Chunk><br/>━━━━━━━━━━━<br/>作为运行时的 Chunk"]
+        RuntimeIn["runtimeInChunks<br/>Set&lt;Chunk&gt;<br/>━━━━━━━━━━━<br/>作为运行时的 Chunk"]
     end
 
     subgraph Relation["🔗 关系"]
@@ -808,7 +866,6 @@ graph TD
 ### 如何阅读流程图
 
 **学习路径**：
-
 ```
 1. 主流程图（图表1）
    ↓ 了解 28 个步骤
@@ -824,7 +881,6 @@ graph TD
 ```
 
 **阅读技巧**：
-
 - 🔴 红色节点：最重要，必须理解
 - 🟢 绿色节点：成功/完成状态
 - 🟡 黄色节点：重要但非核心
@@ -832,14 +888,14 @@ graph TD
 
 ### 核心流程图重点
 
-| 图表  | 重点内容            | 学习时间       |
-| ----- | ------------------- | -------------- |
-| 图表1 | 28 步骤概览         | 5 分钟         |
+| 图表 | 重点内容 | 学习时间 |
+|------|---------|---------|
+| 图表1 | 28 步骤概览 | 5 分钟 |
 | 图表3 | buildChunkGraph BFS | 10 分钟 ⭐⭐⭐ |
-| 图表4 | Tree Shaking 实现   | 8 分钟 ⭐⭐    |
-| 图表5 | 代码分割实现        | 10 分钟 ⭐⭐⭐ |
-| 图表7 | 代码生成机制        | 10 分钟 ⭐⭐   |
-| 图表8 | Chunk → Bundle     | 10 分钟 ⭐⭐⭐ |
+| 图表4 | Tree Shaking 实现 | 8 分钟 ⭐⭐ |
+| 图表5 | 代码分割实现 | 10 分钟 ⭐⭐⭐ |
+| 图表7 | 代码生成机制 | 10 分钟 ⭐⭐ |
+| 图表8 | Chunk → Bundle | 10 分钟 ⭐⭐⭐ |
 
 ---
 
@@ -893,19 +949,16 @@ Bundle (文件)
 ## 配合文档
 
 **文字详解**：
-
 - 09-封装阶段（Seal）.md（白话讲解）
 - 04-Webpack核心运行流程详解.md（完整流程）
 
 **代码注释**：
-
 - lib/Compilation.js:seal()（100% 注释）
 - lib/buildChunkGraph.js（80% 注释）
 - lib/Chunk.js（100% 注释）
 - lib/ChunkGraph.js（60% 注释）
 
 **实践练习**：
-
 - 在关键步骤设置断点
 - 打印 ChunkGraph 结构
 - 观察 Chunk 创建过程
@@ -918,25 +971,21 @@ Bundle (文件)
 ### 通过这些流程图你将理解
 
 ✅ **Seal 阶段的完整流程**
-
 - 28 个步骤的作用
 - 每个步骤的输入输出
 - 步骤之间的关系
 
 ✅ **核心算法**
-
 - buildChunkGraph 的 BFS 遍历
 - minAvailableModules 优化
 - 代码生成的并行处理
 
 ✅ **优化机制**
-
 - Tree Shaking 的三阶段
 - 代码分割的四阶段
 - 哈希的三种类型
 
 ✅ **数据转换**
-
 - ModuleGraph → ChunkGraph
 - Chunk → Source → Bundle
 - 逻辑 → 代码 → 文件
@@ -944,3 +993,4 @@ Bundle (文件)
 ---
 
 **看懂这些流程图 = 理解 Seal 阶段原理！** 🎉
+
